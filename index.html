@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robot Arm Sim — Documentation</title>
+  <meta name="description" content="Technical documentation for the Robot Arm Kinematics Simulator: Denavit–Hartenberg math, DLS + CCD inverse kinematics, collision engine, architecture and API.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+  <style>
+    :root {
+      --bg: #070a12; --panel: rgba(16,21,36,.72); --line: #1c2440; --line-2: #263156;
+      --text: #dbe2f2; --muted: #8592b6; --faint: #5a6690;
+      --accent: #4da3ff; --accent-2: #7c5cff; --ok: #3ddc97; --warn: #ffb347;
+      --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.65;
+      background:
+        radial-gradient(1200px 600px at 80% -10%, #14203f55, transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, #1a124055, transparent 60%),
+        var(--bg);
+      color: var(--text);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, pre { font-family: var(--mono); }
+    code { background: #131a30; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 12px; }
+    pre { background: #0c1222; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 12px; line-height: 1.7; }
+    pre code { background: none; border: none; padding: 0; }
+
+    header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 24px; border-bottom: 1px solid var(--line);
+      background: #0a0e18cc; backdrop-filter: blur(10px);
+    }
+    header .brand { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+    header nav { display: flex; gap: 16px; font-size: 12px; }
+    header nav a { color: var(--muted); }
+    header nav a:hover { color: var(--text); text-decoration: none; }
+
+    .hero { max-width: 900px; margin: 0 auto; padding: 64px 24px 40px; }
+    .eyebrow { color: var(--accent); font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    .hero h1 { font-size: 34px; margin: 8px 0 12px; letter-spacing: -.02em; }
+    .hero p { color: var(--muted); max-width: 620px; font-size: 15px; }
+    .cta { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--line-2); color: var(--text); background: #131a30;
+    }
+    .btn:hover { border-color: var(--accent); text-decoration: none; }
+    .btn.primary { background: linear-gradient(135deg, #16335e, #2a2a72); border-color: #2f5fa8; }
+    .shot { max-width: 900px; margin: 30px auto 0; padding: 0 24px; }
+    .shot img { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 20px 60px #00000088; }
+
+    main { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+    section { margin-bottom: 56px; }
+    h2 { font-size: 21px; margin-bottom: 6px; letter-spacing: -.01em; }
+    h3 { font-size: 15px; margin: 26px 0 8px; color: var(--accent); }
+    h4 { font-size: 13px; margin: 18px 0 6px; }
+    .lead { color: var(--muted); margin-bottom: 18px; }
+    p { margin-bottom: 10px; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 5px; color: var(--muted); }
+    li b, li strong { color: var(--text); }
+    .mathblock { background: #0c1222; border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; margin: 14px 0; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 14px 0; }
+    td, th { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+    td:first-child { font-family: var(--mono); font-size: 11.5px; color: var(--accent); white-space: nowrap; }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 18px 20px; margin-bottom: 14px; backdrop-filter: blur(8px);
+    }
+    .card h4 { margin-top: 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } header nav { display: none; } }
+    .note { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--muted); margin: 14px 0; font-size: 13px; }
+    .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+    .flow span { font-family: var(--mono); font-size: 11px; background: #131a30; border: 1px solid var(--line-2); padding: 5px 11px; border-radius: 7px; }
+    .flow i { color: var(--faint); font-style: normal; }
+    footer { border-top: 1px solid var(--line); padding: 18px 24px; text-align: center; color: var(--faint); font-size: 11.5px; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">🦾 Robot Arm Sim <span style="color:var(--faint);font-weight:400">/ docs</span></div>
+  <nav>
+    <a href="#math">Math</a><a href="#architecture">Architecture</a><a href="#api">API</a>
+    <a href="#usage">Usage</a><a href="#testing">Testing</a>
+    <a href="https://github.com/rabahdj2002/robot-arm-sim" target="_blank" rel="noopener">GitHub ↗</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <p class="eyebrow">robot-arm-sim · technical documentation</p>
+  <h1>Robot Arm Kinematics Simulator</h1>
+  <p>
+    A browser-based simulator for arbitrary serial robot arms. Define any number of
+    revolute and prismatic joints, edit Denavit–Hartenberg parameters live, and get
+    real-time forward kinematics, numerical inverse kinematics, DOF analysis and
+    floor/self collision limits — no build step, no backend.
+  </p>
+  <div class="cta">
+    <a class="btn primary" href="https://rabahdj2002.github.io/robot-arm-sim/" target="_blank" rel="noopener">Live demo ↗</a>
+    <a class="btn" href="https://github.com/rabahdj2002/robot-arm-sim" target="_blank" rel="noopener">Source code</a>
+    <a class="btn" href="https://github.com/rabahdj2002/robot-arm-sim/tree/main/tests" target="_blank" rel="noopener">Test suite (50 tests)</a>
+  </div>
+</div>
+<div class="shot"><img src="assets/screenshot.png" alt="Robot arm simulator viewport: 6-DOF arm reaching toward an IK target marker with HUD, joint editor panel and DH table"></div>
+
+<main>
+  <section id="overview">
+    <h2>Overview</h2>
+    <p class="lead">Everything runs client-side as ES modules — three.js renders, plain JavaScript does the math.</p>
+    <div class="grid2">
+      <div class="card"><h4>Free-form chains</h4><p>Add, remove and reorder revolute &amp; prismatic joints. Edit all four DH parameters (θ₀, d, a, α) plus joint limits per joint — the scene, DH table and DOF count update instantly.</p></div>
+      <div class="card"><h4>Inverse kinematics</h4><p>Two numerical solvers (damped least-squares + cyclic coordinate descent) with structured restarts, a collision-aware validity filter and smooth joint-space easing toward solutions.</p></div>
+      <div class="card"><h4>Collision limits</h4><p>Floor plane, non-adjacent link pairs, adjacent-link fold-over and joint-body proximity — slider moves bisect to the wall, IK solutions are validated before acceptance.</p></div>
+      <div class="card"><h4>Zero-dependency deploy</h4><p>Static files on GitHub Pages. three.js loads from CDN via an import map with version-pinned URLs; the math core has no dependencies at all and runs in Node for tests.</p></div>
+    </div>
+  </section>
+
+  <section id="math">
+    <h2>The mathematics</h2>
+    <p class="lead">All kinematics follow the standard Denavit–Hartenberg convention.</p>
+
+    <h3>Forward kinematics</h3>
+    <p>Each joint contributes one homogeneous transform from four parameters — fixed offset θ₀, d, link length a, twist α — and one variable (θ for revolute, d for prismatic):</p>
+    <div class="mathblock">$$
+      {}^{i-1}A_i =
+      \operatorname{Rot}_z(\theta_i^*)\,
+      \operatorname{Trans}_z(d_i)\,
+      \operatorname{Trans}_x(a_i)\,
+      \operatorname{Rot}_x(\alpha_i)
+    $$</div>
+    <p>The end-effector pose chains them: <code>T<sub>EE</sub> = A₁ · A₂ · … · A<sub>n</sub></code>, evaluated in <code>forwardKinematics()</code>. Orientation readout is roll–pitch–yaw extracted from the rotation block. Degrees of freedom use the Grübler–Kutzbach count, which reduces to the number of actuated joints for an open serial chain.</p>
+
+    <h3>Inverse kinematics — damped least squares</h3>
+    <p>Arbitrary DH chains have no general closed-form IK, so the solver is numerical. The position Jacobian $J \in \mathbb{R}^{3 \times n}$ is computed by central finite differences; each iteration steps the joints by the damped pseudo-inverse:</p>
+    <div class="mathblock">$$
+      \Delta q = J^{T}\,(J J^{T} + \lambda^{2} I)^{-1}\, e,
+      \qquad e = p_{\text{target}} - p_{\text{EE}}
+    $$</div>
+    <p>Only the inner 3×3 system is solved directly (Gaussian elimination with partial pivoting), and per-iteration joint velocity is capped for stability. Damping λ = 0.05 keeps the step well-conditioned near singularities.</p>
+
+    <h3>Cyclic coordinate descent (CCD)</h3>
+    <p>A second, geometric solver walks the chain tip-to-base and rotates each joint about its axis to align the joint→end-effector vector with the joint→target vector. CCD escapes folded / wrong-branch configurations that pure gradient descent cannot, so every restart seed is tried with CCD first and refined with DLS.</p>
+
+    <h3>Restarts, limits and validity</h3>
+    <ul>
+      <li><strong>Limits:</strong> revolute joints spanning a full rotation <em>wrap</em> through ±π (they can pass the seam); joints with a real sub-2π range and all prismatic joints <em>clamp</em>.</li>
+      <li><strong>Seeds:</strong> current pose → base azimuth to the target (and the opposite branch) → base flip → sign flip → deterministic pseudo-random spreads. A 60&nbsp;ms budget keeps live dragging responsive.</li>
+      <li><strong>Validity:</strong> <code>solveIK</code> accepts an optional <code>validate(q)</code> predicate. The UI passes the collision check, so the solver keeps hunting until a branch is <em>both</em> converged and collision-free — only falling back to a colliding solution when every converged branch fails.</li>
+      <li><strong>Motion:</strong> accepted solutions ease toward the goal exponentially in joint space along the shortest wrap-aware path, so the arm glides instead of snapping.</li>
+    </ul>
+
+    <h3>Collision geometry</h3>
+    <p>Links are treated as capsules (radius 0.022&nbsp;m), joints as spheres (0.05&nbsp;m). Checks per configuration:</p>
+    <table>
+      <tr><th>Check</th><th>Method</th><th>Notes</th></tr>
+      <tr><td>link ↔ floor</td><td>segment endpoint / closest-point z below −tolerance</td><td>centerline-based; small tolerance avoids locking ground-level poses</td></tr>
+      <tr><td>link ↔ link</td><td>Ericson segment–segment closest distance</td><td>non-adjacent pairs only</td></tr>
+      <tr><td>adjacent fold</td><td>link direction dot product past a threshold</td><td>catches 180° fold-over missed by the adjacency exemption</td></tr>
+      <tr><td>link ↔ joint, joint ↔ joint</td><td>segment–point and point–point distance vs combined radii</td><td>short-link tether exemption: pairs joined by links shorter than the joint body are structural, not collisions</td></tr>
+    </table>
+  </section>
+
+  <section id="architecture">
+    <h2>Architecture</h2>
+    <p class="lead">Five ES modules, one responsibility each. The math core never touches the DOM or three.js — that's what makes it unit-testable in Node.</p>
+    <div class="flow">
+      <span>index.html</span><i>→</i><span>main.js (scene + wiring)</span><i>→</i>
+      <span>ui.js (panel)</span><i>↔</i><span>dh.js</span><span>ik.js</span><span>collision.js</span><i>↔</i><span>arm.js (three.js)</span>
+    </div>
+    <table>
+      <tr><th>Module</th><th>Responsibility</th></tr>
+      <tr><td>dh.js</td><td>Joint model, DH transform, FK chain, Grübler DOF, DH table, RPY extraction, presets</td></tr>
+      <tr><td>ik.js</td><td>Position Jacobian (finite differences), DLS descent, CCD descent, seed/restart strategy, <code>validate()</code> filtering</td></tr>
+      <tr><td>collision.js</td><td>Capsule/sphere collision queries (floor, self, fold, joint bodies), human-readable descriptions</td></tr>
+      <tr><td>arm.js</td><td>three.js scene graph: link/joint meshes per DH frame, target marker + axes, collision tinting, geometry disposal on rebuild</td></tr>
+      <tr><td>ui.js</td><td>Joint editor cards, collision-aware sliders (bisect to wall), IK controls + status, FK/DH readouts, HUD, animation follower</td></tr>
+      <tr><td>main.js</td><td>Renderer, lights, grid, orbit controls, panel hookup</td></tr>
+    </table>
+    <div class="note">The viewport is y-up while DH convention is z-up: the arm group is rotated −90° about x, and the target marker converts through <code>localToWorld</code> — getting this space conversion right was one of the real bugs found during development.</div>
+  </section>
+
+  <section id="api">
+    <h2>API reference</h2>
+    <h3>dh.js</h3>
+    <table>
+      <tr><th>Function</th><th>Returns</th></tr>
+      <tr><td>makeJoint(type, opts)</td><td>Joint: <code>{name,type,theta,d,a,alpha,min,max,value}</code></td></tr>
+      <tr><td>dhMatrix(theta, d, a, alpha)</td><td>4×4 nested-array transform</td></tr>
+      <tr><td>forwardKinematics(joints, values?)</td><td><code>{transforms, endEffector}</code> — transforms[0] is base … transforms[n] is EE</td></tr>
+      <tr><td>getPosition(T) / getRPY(T)</td><td>[x,y,z] / [roll,pitch,yaw]</td></tr>
+      <tr><td>degreesOfFreedom(joints)</td><td>Actuated joint count (Grübler for serial chains)</td></tr>
+      <tr><td>dhTable(joints)</td><td>Per-joint effective parameters + variable marker</td></tr>
+      <tr><td>PRESETS</td><td>2R planar · 3R articulated · SCARA · PUMA-style 6R</td></tr>
+    </table>
+    <h3>ik.js</h3>
+    <table>
+      <tr><th>Function</th><th>Returns</th></tr>
+      <tr><td>positionJacobian(joints, values)</td><td>3×n Jacobian via central differences</td></tr>
+      <tr><td>solveIK(joints, target, opts)</td><td><code>{values, converged, iterations, error}</code>; opts: <code>maxIterations, tolerance, damping, restarts, budgetMs, validate</code></td></tr>
+    </table>
+    <h3>collision.js</h3>
+    <table>
+      <tr><th>Function</th><th>Returns</th></tr>
+      <tr><td>checkCollisions(joints, values?)</td><td><code>null</code> or <code>{type:'floor'|'self'|'adjacent'|'joint', link, joint, pair}</code></td></tr>
+      <tr><td>describeCollision(hit)</td><td>Human-readable string, e.g. <em>"links 2 and 5 intersect"</em></td></tr>
+    </table>
+  </section>
+
+  <section id="usage">
+    <h2>Using the simulator</h2>
+    <ul>
+      <li><strong>Build a chain:</strong> load a preset or add revolute/prismatic joints; edit name, type, DH params and slider limits on each card.</li>
+      <li><strong>Drive joints:</strong> drag sliders, type values, or hit the 0°/±90°/180° snap chips. With collision limits on, motion bisects to the contact point.</li>
+      <li><strong>IK target:</strong> drag the X/Y/Z target sliders (or numbers). <em>Arm follows target</em> solves continuously; <em>Solve IK</em> solves on demand. The marker's RGB arrows show the DH frame.</li>
+      <li><strong>Read the math:</strong> live DOF + EE pose in the viewport HUD and panel, plus the generated DH table with the variable of each joint marked.</li>
+      <li><strong>Frames toggle:</strong> show/hide RGB axis triads at every DH frame; <em>Reset view</em> restores the camera.</li>
+    </ul>
+  </section>
+
+  <section id="testing">
+    <h2>Testing</h2>
+    <p class="lead">50 unit tests run in Node's built-in runner — no dependencies, no DOM needed since the math core is pure.</p>
+    <pre><code>git clone https://github.com/rabahdj2002/robot-arm-sim.git
+cd robot-arm-sim
+node --test tests/*.test.js   # 50 passing</code></pre>
+    <div class="grid2">
+      <div class="card"><h4>tests/dh.test.js</h4><p>Matrix identity/-0 handling, known FK configurations, rotation orthonormality, mutation cases: empty chain, single joint, 1–8 mixed chains, mid-chain and first-joint removal.</p></div>
+      <div class="card"><h4>tests/ik.test.js</h4><p>Convergence on 2R/6R, joint-limit respect, ±π wrap-through, wrong-side base recovery, elbow branch flips, restricted-limit clamping, <code>validate()</code> branch selection and fallback.</p></div>
+      <div class="card"><h4>tests/collision.test.js</h4><p>Floor detection both directions, adjacency exemption, degenerate links, all presets collision-free at defaults, joint-body checks, candidate-pose override.</p></div>
+      <div class="card"><h4>CI</h4><p>GitHub Actions workflow in <code>.github/workflows/ci.yml</code> runs the suite on every push.</p></div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <h2>Roadmap</h2>
+    <ul>
+      <li>Viewport drag-the-target (pick the marker and pull the arm)</li>
+      <li>Orientation-aware IK (6D error on SE(3))</li>
+      <li>Symbolic FK export — chain equations for the user's config</li>
+      <li>Collision-avoiding IK via repulsive potentials in the null space</li>
+      <li>URDF import/export</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  robot-arm-sim documentation · <a href="https://rabahdj2002.github.io/robot-arm-sim/" target="_blank" rel="noopener">live demo</a> ·
+  <a href="https://github.com/rabahdj2002/robot-arm-sim" target="_blank" rel="noopener">source</a> ·
+  <a href="https://github.com/rabahdj2002/robot-arm-sim/tree/main/tests" target="_blank" rel="noopener">tests</a>
+</footer>
+</body>
+</html>
