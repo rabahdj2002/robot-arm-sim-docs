@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Robot Arm Sim — Documentation</title>
-  <meta name="description" content="Technical documentation for the Robot Arm Kinematics Simulator: Denavit–Hartenberg math, DLS + CCD inverse kinematics, collision engine, architecture and API.">
+  <meta name="description" content="Technical documentation for the Robot Arm Kinematics Simulator: Denavit–Hartenberg math, DLS + CCD inverse kinematics, collision engine, refined workspace envelope, trajectories, architecture and API.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -49,7 +49,7 @@
     .hero { max-width: 900px; margin: 0 auto; padding: 64px 24px 40px; }
     .eyebrow { color: var(--accent); font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
     .hero h1 { font-size: 34px; margin: 8px 0 12px; letter-spacing: -.02em; }
-    .hero p { color: var(--muted); max-width: 620px; font-size: 15px; }
+    .hero p { color: var(--muted); max-width: 660px; font-size: 15px; }
     .cta { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
     .btn {
       display: inline-block; padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 600;
@@ -59,15 +59,16 @@
     .btn.primary { background: linear-gradient(135deg, #16335e, #2a2a72); border-color: #2f5fa8; }
     .shot { max-width: 900px; margin: 30px auto 0; padding: 0 24px; }
     .shot img { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 20px 60px #00000088; }
+    .shot figcaption { color: var(--faint); font-size: 11.5px; text-align: center; margin-top: 8px; }
 
     main { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
-    section { margin-bottom: 56px; }
+    section { margin-bottom: 56px; scroll-margin-top: 70px; }
     h2 { font-size: 21px; margin-bottom: 6px; letter-spacing: -.01em; }
     h3 { font-size: 15px; margin: 26px 0 8px; color: var(--accent); }
     h4 { font-size: 13px; margin: 18px 0 6px; }
     .lead { color: var(--muted); margin-bottom: 18px; }
     p { margin-bottom: 10px; }
-    ul { padding-left: 20px; margin-bottom: 12px; }
+    ul, ol { padding-left: 20px; margin-bottom: 12px; }
     li { margin-bottom: 5px; color: var(--muted); }
     li b, li strong { color: var(--text); }
     .mathblock { background: #0c1222; border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; margin: 14px 0; overflow-x: auto; }
@@ -80,12 +81,16 @@
       padding: 18px 20px; margin-bottom: 14px; backdrop-filter: blur(8px);
     }
     .card h4 { margin-top: 0; }
+    .card p, .card li { font-size: 13px; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } header nav { display: none; } }
     .note { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--muted); margin: 14px 0; font-size: 13px; }
+    .note.warn { border-color: var(--warn); }
     .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
     .flow span { font-family: var(--mono); font-size: 11px; background: #131a30; border: 1px solid var(--line-2); padding: 5px 11px; border-radius: 7px; }
     .flow i { color: var(--faint); font-style: normal; }
+    .tag { font-family: var(--mono); font-size: 10px; color: var(--ok); border: 1px solid #2a4d3f; background: #0f2018; padding: 1px 7px; border-radius: 20px; vertical-align: 2px; margin-left: 6px; }
+    kbd { font-family: var(--mono); font-size: 11px; background: #131a30; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
     footer { border-top: 1px solid var(--line); padding: 18px 24px; text-align: center; color: var(--faint); font-size: 11.5px; }
   </style>
 </head>
@@ -93,44 +98,50 @@
 <header>
   <div class="brand">🦾 Robot Arm Sim <span style="color:var(--faint);font-weight:400">/ docs</span></div>
   <nav>
-    <a href="#math">Math</a><a href="#architecture">Architecture</a><a href="#api">API</a>
-    <a href="#usage">Usage</a><a href="#testing">Testing</a>
-    <a href="https://github.com/rabahdj2002/robot-arm-sim" target="_blank" rel="noopener">GitHub ↗</a>
+    <a href="#math">Math</a><a href="#workspace">Workspace dome</a><a href="#features">Features</a>
+    <a href="#architecture">Architecture</a><a href="#api">API</a><a href="#usage">Usage</a><a href="#testing">Testing</a>
+    <a href="https://rabahdj2002.github.io/robot-arm-sim/" target="_blank" rel="noopener">Live demo ↗</a>
   </nav>
 </header>
 
 <div class="hero">
-  <p class="eyebrow">robot-arm-sim · technical documentation</p>
+  <p class="eyebrow">robot-arm-sim · technical documentation · v2.3</p>
   <h1>Robot Arm Kinematics Simulator</h1>
   <p>
     A browser-based simulator for arbitrary serial robot arms. Define any number of
     revolute and prismatic joints, edit Denavit–Hartenberg parameters live, and get
-    real-time forward kinematics, numerical inverse kinematics, DOF analysis and
-    floor/self collision limits — no build step, no backend.
+    real-time forward kinematics, collision-aware inverse kinematics, a refined
+    workspace-envelope dome, trajectory record/playback, drag-the-target control and
+    shareable configuration links — no build step, no backend.
   </p>
   <div class="cta">
     <a class="btn primary" href="https://rabahdj2002.github.io/robot-arm-sim/" target="_blank" rel="noopener">Live demo ↗</a>
     <a class="btn" href="https://github.com/rabahdj2002/robot-arm-sim" target="_blank" rel="noopener">Source code</a>
-    <a class="btn" href="https://github.com/rabahdj2002/robot-arm-sim/tree/main/tests" target="_blank" rel="noopener">Test suite (50 tests)</a>
+    <a class="btn" href="https://github.com/rabahdj2002/robot-arm-sim/tree/main/tests" target="_blank" rel="noopener">Test suite (60 tests)</a>
   </div>
 </div>
-<div class="shot"><img src="assets/screenshot.png" alt="Robot arm simulator viewport: 6-DOF arm reaching toward an IK target marker with HUD, joint editor panel and DH table"></div>
+<figure class="shot">
+  <img src="assets/screenshot.png" alt="Robot arm simulator viewport: 6-DOF PUMA-style arm inside its translucent workspace-envelope dome, with joint editor panel and DH table">
+  <figcaption>PUMA-style 6R arm with the refined workspace-envelope dome enabled</figcaption>
+</figure>
 
 <main>
   <section id="overview">
     <h2>Overview</h2>
-    <p class="lead">Everything runs client-side as ES modules — three.js renders, plain JavaScript does the math.</p>
+    <p class="lead">Everything runs client-side as ES modules — three.js renders, plain JavaScript does the math. No build step, no bundler, no backend.</p>
     <div class="grid2">
       <div class="card"><h4>Free-form chains</h4><p>Add, remove and reorder revolute &amp; prismatic joints. Edit all four DH parameters (θ₀, d, a, α) plus joint limits per joint — the scene, DH table and DOF count update instantly.</p></div>
-      <div class="card"><h4>Inverse kinematics</h4><p>Two numerical solvers (damped least-squares + cyclic coordinate descent) with structured restarts, a collision-aware validity filter and smooth joint-space easing toward solutions.</p></div>
-      <div class="card"><h4>Collision limits</h4><p>Floor plane, non-adjacent link pairs, adjacent-link fold-over and joint-body proximity — slider moves bisect to the wall, IK solutions are validated before acceptance.</p></div>
-      <div class="card"><h4>Zero-dependency deploy</h4><p>Static files on GitHub Pages. three.js loads from CDN via an import map with version-pinned URLs; the math core has no dependencies at all and runs in Node for tests.</p></div>
+      <div class="card"><h4>Collision-aware IK</h4><p>Damped least-squares + cyclic coordinate descent with structured restarts and a validity filter — the solver hunts for a branch that is both converged <em>and</em> collision-free.</p></div>
+      <div class="card"><h4>Workspace-envelope dome</h4><p>A translucent shell fitted to the true reach boundary: Monte-Carlo seeded, then refined per direction by coordinate descent so every vertex is a genuinely reachable extreme.</p></div>
+      <div class="card"><h4>Trajectory record/playback</h4><p>Capture joint-space waypoints and play them back with smoothstep, wrap-aware blending — the EE leaves a fading trail ribbon behind.</p></div>
+      <div class="card"><h4>Drag-the-target</h4><p>Grab the IK marker directly in the viewport; the arm follows live through the full collision + branch-solving pipeline while you pull it.</p></div>
+      <div class="card"><h4>Shareable configs</h4><p>The whole chain — names, types, DH params, limits, pose — encodes into a ~400-char URL hash. Send the link, get the same arm.</p></div>
     </div>
   </section>
 
   <section id="math">
     <h2>The mathematics</h2>
-    <p class="lead">All kinematics follow the standard Denavit–Hartenberg convention.</p>
+    <p class="lead">All kinematics follow the standard Denavit–Hartenberg convention; everything else is numerical methods chosen for robustness over elegance.</p>
 
     <h3>Forward kinematics</h3>
     <p>Each joint contributes one homogeneous transform from four parameters — fixed offset θ₀, d, link length a, twist α — and one variable (θ for revolute, d for prismatic):</p>
@@ -171,25 +182,107 @@
       <tr><td>adjacent fold</td><td>link direction dot product past a threshold</td><td>catches 180° fold-over missed by the adjacency exemption</td></tr>
       <tr><td>link ↔ joint, joint ↔ joint</td><td>segment–point and point–point distance vs combined radii</td><td>short-link tether exemption: pairs joined by links shorter than the joint body are structural, not collisions</td></tr>
     </table>
+
+    <h3>Trajectory interpolation</h3>
+    <p>Waypoint playback eases each joint along the shortest wrap-aware path with a smoothstep blend — zero velocity at waypoints, no joint snapping at the ±π seam:</p>
+    <div class="mathblock">$$
+      q_i(t) = a_i + \Delta_{\text{wrap}}(a_i, b_i)\cdot s(u),
+      \qquad s(u) = 3u^2 - 2u^3
+    $$</div>
+    <p>where $\Delta_{\text{wrap}}$ folds the signed difference into $[-\pi,\pi)$ for joints whose range spans a full rotation. Loop mode appends a closing segment back to the first waypoint.</p>
+  </section>
+
+  <section id="workspace">
+    <h2>The workspace-envelope dome</h2>
+    <p class="lead">The cyan dome is not a point cloud and not a guess — it is a triangulated shell fitted to the true outer boundary of the reachable workspace, verified to be azimuth-symmetric to ±2&nbsp;cm for a symmetric arm.</p>
+
+    <h3>Why the naive version lied</h3>
+    <p>The first implementation scattered raw Monte-Carlo samples — visually noisy, and it systematically <em>undershot</em> the envelope because random sampling rarely lands on the boundary. Binning then mean-filling gaps did the opposite — it <em>fabricated</em> reach in directions that were never sampled. Neither answered the real question:</p>
+    <div class="mathblock">$$
+      R(\hat{d}) = \max \{\, t \ge 0 : t\hat{d} \in W \,\}
+      \qquad \text{for each direction } \hat{d} \text{ from the base}
+    $$</div>
+
+    <h3>The pipeline</h3>
+    <div class="flow">
+      <span>40k FK samples (joints + EE pos)</span><i>→</i>
+      <span>bin by direction 72×36</span><i>→</i>
+      <span>coordinate-descent refine</span><i>→</i>
+      <span>azimuth-transplant diffusion ×6</span><i>→</i>
+      <span>last-resort gap fill</span><i>→</i>
+      <span>tangential smooth</span><i>→</i>
+      <span>triangulate + fresnel dome</span>
+    </div>
+
+    <h4>1 · Directional sampling</h4>
+    <p><code>sampleWorkspaceConfigs()</code> draws 40,000 random joint configurations, runs FK on each, and keeps the EE position <em>and the joint values behind it</em>. Positions are binned by direction from the base (azimuth × elevation, 72×36 cells); each cell remembers its farthest sample <em>and the configuration that produced it</em>.</p>
+
+    <h4>2 · Per-direction refinement</h4>
+    <p>For every occupied cell, <code>refineReach()</code> runs coordinate descent in joint space: perturb each joint by a shrinking step (0.5&nbsp;rad → 0.012&nbsp;rad), keep moves that grow the EE's distance along the cell's ray, subject to joint limits, the cell's angular cone (center→corner tolerance ≈ 3.5°) and the floor constraint. The result is a <strong>real reachable extreme</strong> — the dome can only ever claim reach the arm provably has.</p>
+
+    <h4>3 · Diffusion + azimuth transplant</h4>
+    <p>Refinement from a single random seed lands in local optima, so each cell re-refines from the best config among itself and its 4-neighbors, for up to 6 rounds until the field converges. When joint&nbsp;1 is a revolute base rotation, seeds borrowed across azimuth are <em>rotated by the azimuth difference first</em> — rotating J1 rigidly rotates the whole distal chain, so a proven solution transplants exactly. Limited-waist arms skip the rotation automatically, preserving genuinely asymmetric workspaces.</p>
+
+    <h4>4 · Floor-aware fill &amp; honest holes</h4>
+    <p>Cells still empty after diffusion are truly unsolvable directions — they stay holes, except a small mean-fill pass that gives degenerate thin workspaces (a planar arm's flat ring) enough rows to triangulate. Directions whose rays can never rise above the floor are never filled.</p>
+
+    <h4>5 · Tangential smoothing without lying</h4>
+    <p>Each vertex slides toward its neighbors' centroid <em>along its own radius-sphere</em>, then is renormalized back to the refined radius. Bin-edge stair steps disappear; the claimed reach in every direction is untouched.</p>
+
+    <h4>6 · Fresnel rendering</h4>
+    <p>The shell renders as one mesh with a fresnel shader — dark translucent body, rim lighting proportional to $(1 - |\hat{n}\cdot\hat{v}|)^2$ — so you see through the dome while the silhouette glows, and the arm stays readable inside it.</p>
+
+    <h3>What the dome guarantees — and what it doesn't</h3>
+    <table>
+      <tr><th>Property</th><th>Guarantee</th></tr>
+      <tr><td>never overstates</td><td>every radius is the distance to a verified reachable configuration</td></tr>
+      <tr><td>never understates much</td><td>refined radius ≥ best MC sample; converges to the true extreme within ~1–2&nbsp;cm</td></tr>
+      <tr><td>respects limits &amp; floor</td><td>refinement enforces joint limits and z&nbsp;≥&nbsp;0 on every accepted step</td></tr>
+      <tr><td>outer boundary only</td><td>inner voids (unreachable pockets inside the shell) are not representable — the dome is the envelope, not the volume</td></tr>
+    </table>
+    <div class="note">Verified shape for the PUMA-style preset: ~0.49&nbsp;m reach at floor level (the EE physically cannot get closer to the base at that height) bulging to 0.79&nbsp;m overhead — exactly d₁+a₂+d₄+d₆. The pinch where the dome meets the floor is real physics, not a rendering bug.</div>
+  </section>
+
+  <section id="features">
+    <h2>Interactive features</h2>
+
+    <h3>Drag-the-target <span class="tag">v2.0</span></h3>
+    <p>The green IK marker is a real raycastable object — grab it and pull. Each pointer move raycasts onto a camera-facing drag plane anchored at the grab point, converts the hit through <code>worldToLocal</code> (viewport is y-up, DH space is z-up), and re-solves IK live. The full pipeline stays engaged: restarts, branch flipping, collision validation — you can literally drag the arm into poses it refuses.</p>
+
+    <h3>Trajectory record &amp; playback <span class="tag">v2.0</span></h3>
+    <p><strong>+ Waypoint</strong> captures the current pose; <strong>Play</strong> eases through them with smoothstep blending and the same wrap-aware shortest path the IK follower uses. Loop mode chains a closing segment back to the start. Any manual input — a slider grab, an IK solve — cancels playback instantly.</p>
+
+    <h3>EE trail <span class="tag">v2.0</span></h3>
+    <p>A 1500-point fading ribbon tracks the end-effector in world space. Best combined with trajectory playback — you watch the loop the arm actually draws, which is a fast way to spot wrap artifacts or boundary-hugging paths.</p>
+
+    <h3>Shareable configurations <span class="tag">v2.0</span></h3>
+    <p><strong>Copy share link</strong> serializes the whole chain — names, types, all four DH params, limits, and the current pose — into a versioned base64url JSON blob in the <code>#config=</code> hash (~400 chars for a 6R arm). Opening the link rebuilds the exact arm, no backend involved.</p>
+
+    <h3>Collision limits</h3>
+    <p>With <em>collision limits (floor + self)</em> on, slider moves bisect to the contact wall instead of teleporting into an invalid pose, IK validates every converged branch, and offending links/joints tint red in the viewport.</p>
   </section>
 
   <section id="architecture">
     <h2>Architecture</h2>
-    <p class="lead">Five ES modules, one responsibility each. The math core never touches the DOM or three.js — that's what makes it unit-testable in Node.</p>
+    <p class="lead">Eight ES modules, one responsibility each. The math core never touches the DOM or three.js — that's what makes it unit-testable in Node.</p>
     <div class="flow">
       <span>index.html</span><i>→</i><span>main.js (scene + wiring)</span><i>→</i>
-      <span>ui.js (panel)</span><i>↔</i><span>dh.js</span><span>ik.js</span><span>collision.js</span><i>↔</i><span>arm.js (three.js)</span>
+      <span>ui.js (panel)</span><i>↔</i><span>dh.js</span><span>ik.js</span><span>collision.js</span><span>config.js</span><span>workspace.js</span><span>trajectory.js</span><i>↔</i><span>arm.js (three.js)</span>
     </div>
     <table>
       <tr><th>Module</th><th>Responsibility</th></tr>
       <tr><td>dh.js</td><td>Joint model, DH transform, FK chain, Grübler DOF, DH table, RPY extraction, presets</td></tr>
       <tr><td>ik.js</td><td>Position Jacobian (finite differences), DLS descent, CCD descent, seed/restart strategy, <code>validate()</code> filtering</td></tr>
       <tr><td>collision.js</td><td>Capsule/sphere collision queries (floor, self, fold, joint bodies), human-readable descriptions</td></tr>
-      <tr><td>arm.js</td><td>three.js scene graph: link/joint meshes per DH frame, target marker + axes, collision tinting, geometry disposal on rebuild</td></tr>
-      <tr><td>ui.js</td><td>Joint editor cards, collision-aware sliders (bisect to wall), IK controls + status, FK/DH readouts, HUD, animation follower</td></tr>
-      <tr><td>main.js</td><td>Renderer, lights, grid, orbit controls, panel hookup</td></tr>
+      <tr><td>config.js</td><td>Compact base64url (de)serialization of the whole chain; <code>#config=</code> hash parsing, share-URL building</td></tr>
+      <tr><td>workspace.js</td><td>Monte-Carlo workspace sampling, per-direction reach refinement, diffusion, dome shell construction</td></tr>
+      <tr><td>trajectory.js</td><td>Wrap-aware deltas, smoothstep waypoint interpolation, loop handling</td></tr>
+      <tr><td>arm.js</td><td>three.js scene graph: link/joint meshes per DH frame, target marker + axes, collision tinting, EE trail ribbon, workspace dome mesh, geometry disposal on rebuild</td></tr>
+      <tr><td>ui.js</td><td>Joint editor cards, collision-aware sliders (bisect to wall), IK controls + status, trajectory/record UI, toggles, FK/DH readouts, HUD, animation follower</td></tr>
+      <tr><td>main.js</td><td>Renderer, lights, grid, orbit controls, drag-the-target raycasting, config-from-hash bootstrap, panel hookup, <code>window.__app</code> debug handle</td></tr>
     </table>
-    <div class="note">The viewport is y-up while DH convention is z-up: the arm group is rotated −90° about x, and the target marker converts through <code>localToWorld</code> — getting this space conversion right was one of the real bugs found during development.</div>
+    <div class="note">The viewport is y-up while DH convention is z-up: the arm group is rotated −90° about x, and every world-space interaction (drag, marker, trail, dome) converts through <code>localToWorld</code>/<code>worldToLocal</code> — getting this space conversion right was one of the real bugs found during development.</div>
+    <div class="note warn">GitHub Pages caches module JS for ~10&nbsp;min. Every deploy bumps <code>?v=</code> on every import-map URL and the footer tag — that's why the version string appears in index.html.</div>
   </section>
 
   <section id="api">
@@ -209,13 +302,35 @@
     <table>
       <tr><th>Function</th><th>Returns</th></tr>
       <tr><td>positionJacobian(joints, values)</td><td>3×n Jacobian via central differences</td></tr>
-      <tr><td>solveIK(joints, target, opts)</td><td><code>{values, converged, iterations, error}</code>; opts: <code>maxIterations, tolerance, damping, restarts, budgetMs, validate</code></td></tr>
+      <tr><td>solveIK(joints, target, opts)</td><td><code>{values, converged, iterations, error, valid}</code>; opts: <code>maxIterations, tolerance, damping, restarts, budgetMs, validate</code></td></tr>
     </table>
     <h3>collision.js</h3>
     <table>
       <tr><th>Function</th><th>Returns</th></tr>
       <tr><td>checkCollisions(joints, values?)</td><td><code>null</code> or <code>{type:'floor'|'self'|'adjacent'|'joint', link, joint, pair}</code></td></tr>
       <tr><td>describeCollision(hit)</td><td>Human-readable string, e.g. <em>"links 2 and 5 intersect"</em></td></tr>
+    </table>
+    <h3>workspace.js</h3>
+    <table>
+      <tr><th>Function</th><th>Returns</th></tr>
+      <tr><td>sampleWorkspace(joints, n, rng?, zMin?)</td><td>Float32Array of EE positions [x,y,z]×k, z ≥ zMin</td></tr>
+      <tr><td>sampleWorkspaceConfigs(joints, n, rng?, zMin?)</td><td><code>{positions, values}</code> — positions plus the joint config behind each sample (refinement seeds)</td></tr>
+      <tr><td>workspaceShell(positions, azBins?, elBins?, zMin?, joints?, values?)</td><td><code>{positions, indices}</code> — triangulated dome shell in DH space; pass joints+values to enable reach refinement</td></tr>
+      <tr><td>workspaceBounds(positions)</td><td><code>{rMax, zMin, zMax}</code> radial reach bounds</td></tr>
+    </table>
+    <h3>trajectory.js</h3>
+    <table>
+      <tr><th>Function</th><th>Returns</th></tr>
+      <tr><td>wrapDelta(a, b, joint)</td><td>Shortest signed delta a→b, folded into ±π for full-range revolute joints</td></tr>
+      <tr><td>trajectoryAt(waypoints, joints, t, segSec?, loop?)</td><td>Interpolated joint values at trajectory time t (seconds)</td></tr>
+    </table>
+    <h3>config.js</h3>
+    <table>
+      <tr><th>Function</th><th>Returns</th></tr>
+      <tr><td>encodeConfig(joints)</td><td>base64url string (versioned JSON, short keys, 5-decimal numbers)</td></tr>
+      <tr><td>decodeConfig(b64)</td><td>Fresh joint objects (values clamped into limits); throws on bad input</td></tr>
+      <tr><td>configFromHash(hash)</td><td>Decoded joints or <code>null</code></td></tr>
+      <tr><td>shareUrl(joints, base?)</td><td>Full shareable URL with <code>#config=</code> hash</td></tr>
     </table>
   </section>
 
@@ -224,22 +339,27 @@
     <ul>
       <li><strong>Build a chain:</strong> load a preset or add revolute/prismatic joints; edit name, type, DH params and slider limits on each card.</li>
       <li><strong>Drive joints:</strong> drag sliders, type values, or hit the 0°/±90°/180° snap chips. With collision limits on, motion bisects to the contact point.</li>
-      <li><strong>IK target:</strong> drag the X/Y/Z target sliders (or numbers). <em>Arm follows target</em> solves continuously; <em>Solve IK</em> solves on demand. The marker's RGB arrows show the DH frame.</li>
+      <li><strong>IK target:</strong> drag the green marker in the viewport, or use the X/Y/Z sliders. <em>Arm follows target</em> solves continuously; <em>Solve IK</em> solves on demand. The marker's RGB arrows show the DH frame.</li>
+      <li><strong>See the reach:</strong> toggle <em>workspace dome</em> to render the refined reachable envelope (~2&nbsp;s one-time compute).</li>
+      <li><strong>Record motion:</strong> <em>+ Waypoint</em> captures poses, <em>Play</em> blends through them (loop mode optional); enable <em>EE trail</em> to draw the tip's path.</li>
+      <li><strong>Share an arm:</strong> <em>Copy share link</em> puts a <code>#config=</code> URL on the clipboard — anyone opening it gets your exact chain and pose.</li>
       <li><strong>Read the math:</strong> live DOF + EE pose in the viewport HUD and panel, plus the generated DH table with the variable of each joint marked.</li>
-      <li><strong>Frames toggle:</strong> show/hide RGB axis triads at every DH frame; <em>Reset view</em> restores the camera.</li>
+      <li><strong>Camera &amp; docs:</strong> drag to orbit, scroll to zoom, right-drag to pan; <em>Frames</em> toggles DH axis triads; <em>Reset view</em> restores the camera; <em>Docs ↗</em> opens this page.</li>
     </ul>
   </section>
 
   <section id="testing">
     <h2>Testing</h2>
-    <p class="lead">50 unit tests run in Node's built-in runner — no dependencies, no DOM needed since the math core is pure.</p>
+    <p class="lead">60 unit tests run in Node's built-in runner — no dependencies, no DOM needed since the math core is pure.</p>
     <pre><code>git clone https://github.com/rabahdj2002/robot-arm-sim.git
 cd robot-arm-sim
-node --test tests/*.test.js   # 50 passing</code></pre>
+node --test tests/*.test.js   # 60 passing</code></pre>
     <div class="grid2">
       <div class="card"><h4>tests/dh.test.js</h4><p>Matrix identity/-0 handling, known FK configurations, rotation orthonormality, mutation cases: empty chain, single joint, 1–8 mixed chains, mid-chain and first-joint removal.</p></div>
       <div class="card"><h4>tests/ik.test.js</h4><p>Convergence on 2R/6R, joint-limit respect, ±π wrap-through, wrong-side base recovery, elbow branch flips, restricted-limit clamping, <code>validate()</code> branch selection and fallback.</p></div>
       <div class="card"><h4>tests/collision.test.js</h4><p>Floor detection both directions, adjacency exemption, degenerate links, all presets collision-free at defaults, joint-body checks, candidate-pose override.</p></div>
+      <div class="card"><h4>tests/config.test.js</h4><p>Config encode/decode round-trip, URL-safe output, hash parsing, wrap-aware deltas, trajectory boundary/loop cases, workspace bounds, dome vertices within reach, floor clipping, and the refinement guarantee (refined ≥ sampled, ≤ reach bound).</p></div>
+      <div class="card"><h4>E2E smoke</h4><p>Headless-Chrome harness (Puppeteer) drives the real page: marker raycast-drag moves the target, dome mesh builds, share-link URLs rebuild the chain, trajectories play — zero console errors.</p></div>
       <div class="card"><h4>CI</h4><p>GitHub Actions workflow in <code>.github/workflows/ci.yml</code> runs the suite on every push.</p></div>
     </div>
   </section>
@@ -247,11 +367,12 @@ node --test tests/*.test.js   # 50 passing</code></pre>
   <section id="roadmap">
     <h2>Roadmap</h2>
     <ul>
-      <li>Viewport drag-the-target (pick the marker and pull the arm)</li>
-      <li>Orientation-aware IK (6D error on SE(3))</li>
-      <li>Symbolic FK export — chain equations for the user's config</li>
+      <li>Orientation-aware IK (6D error on SE(3), target orientation control)</li>
+      <li>Inner-workspace voids in the dome (multi-shell rendering)</li>
       <li>Collision-avoiding IK via repulsive potentials in the null space</li>
+      <li>Symbolic FK export — chain equations for the user's actual config</li>
       <li>URDF import/export</li>
+      <li>Workspace dome computation in a Web Worker (off-main-thread)</li>
     </ul>
   </section>
 </main>
